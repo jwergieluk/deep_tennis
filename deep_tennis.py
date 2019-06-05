@@ -17,7 +17,7 @@ import click
 import time
 
 
-BUFFER_SIZE = int(1e6)  # replay buffer size
+BUFFER_SIZE = int(50000)  # replay buffer size
 BATCH_SIZE = 256        # minibatch size
 GAMMA = 0.99            # discount factor
 TAU = 1e-3              # for soft update of target parameters
@@ -26,8 +26,12 @@ LR_CRITIC = 1e-3        # learning rate of the critic
 WEIGHT_DECAY = 0        # L2 weight decay
 EPSILON = 1.0
 EPSILON_DECAY = 1e-6
+TRAIN_EVERY = 5
+TRAIN_STEPS = 10
 
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+DEVICE = torch.device("cpu")
+# DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class Actor(nn.Module):
@@ -118,8 +122,8 @@ class Agent:
             self.memory.add(state, action, reward, next_state, done)
 
         # Learn, if enough samples are available in memory
-        if len(self.memory) > BATCH_SIZE and timestep % 20 == 0:
-            for _ in range(10):
+        if len(self.memory) > BATCH_SIZE and timestep % TRAIN_EVERY == 0:
+            for _ in range(TRAIN_STEPS):
                 experiences = self.memory.sample()
                 self.learn(experiences, GAMMA)
 
@@ -321,7 +325,7 @@ def train(max_episodes: int, episode_len: int = 3000):
               f'Average score (last 100 episodes) {rolling_average_score:.2f}. '
               f'Replay buffer size {len(agent.memory)}.')
 
-        if episode % 10 == 0:
+        if episode % 50 == 0:
             torch.save(agent.actor_local.state_dict(), f'checkpoint_actor_{episode}.pth')
             torch.save(agent.critic_local.state_dict(), f'checkpoint_critic_{episode}.pth')
 
@@ -369,26 +373,8 @@ def cli():
 def train_command(max_episodes: int):
     """ Train the agent using a head-less environment and save the parameters when done """
 
-    env = UnityMultiAgentEnvWrapper('Tennis_Linux/Tennis.x86_64', train_mode=False)
-    env.print()
-
-    states = None
-    scores = np.zeros(env.num_agents)
-    while True:
-        time.sleep(0.5)
-        actions = np.random.randn(env.num_agents, env.action_space_dim) # select an action (for each agent)
-        actions = np.clip(actions, -1, 1)                  # all actions between -1 and 1
-        next_states, rewards, dones, _ = env.step(actions)
-
-        print('next_states', next_states)
-        print('rewards', rewards)
-        print('dones', dones)
-        scores += rewards                                  # update the score (for each agent)
-        states = next_states                               # roll over states to next time step
-        if np.any(dones):                                  # exit loop if episode finished
-            break
-
-    # train(max_episodes)
+    # https://papers.nips.cc/paper/7217-multi-agent-actor-critic-for-mixed-cooperative-competitive-environments.pdf
+    train(max_episodes)
 
 
 @cli.command('test')
