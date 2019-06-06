@@ -14,11 +14,10 @@ import torch.optim as optim
 
 from collections import deque, namedtuple
 import click
-import time
 
 
-BUFFER_SIZE = int(50000)  # replay buffer size
-BATCH_SIZE = 256        # minibatch size
+BUFFER_SIZE = int(2e5)  # replay buffer size
+BATCH_SIZE = 384        # minibatch size
 GAMMA = 0.99            # discount factor
 TAU = 1e-3              # for soft update of target parameters
 LR_ACTOR = 1e-3         # learning rate of the actor
@@ -325,21 +324,21 @@ def train(max_episodes: int, episode_len: int = 3000):
               f'Average score (last 100 episodes) {rolling_average_score:.2f}. '
               f'Replay buffer size {len(agent.memory)}.')
 
-        if episode % 50 == 0:
+        if episode % 50 == 0 and rolling_average_score > 0.15:
             torch.save(agent.actor_local.state_dict(), f'checkpoint_actor_{episode}.pth')
             torch.save(agent.critic_local.state_dict(), f'checkpoint_critic_{episode}.pth')
 
-    df = pandas.DataFrame(data=data, index=range(1, episode+1), columns=['score', 'rolling_avg_score'])
-    now_str = datetime.datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
-    df.to_csv(f'scores-{now_str}.csv')
-
+        if episode % 50 == 0 and rolling_average_score > 0.15:
+            df = pandas.DataFrame(data=data, index=range(1, episode+1), columns=['score', 'rolling_avg_score'])
+            now_str = datetime.datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
+            df.to_csv(f'scores-{now_str}.csv')
     env.close()
 
 
 def test(actor_weights_file: str, critic_weights_file: str):
     """ Load model parameters and run the agent """
     env = UnityMultiAgentEnvWrapper('Tennis_Linux/Tennis.x86_64', train_mode=False)
-    agent = Agent(state_size=env.state_space_dim, action_size=env.action_space_dim, random_seed=8276364)
+    agent = Agent(state_size=env.state_space_dim, action_size=env.action_space_dim, random_seed=random.randint(1, 1e6))
 
     agent.actor_local.load_state_dict(torch.load(actor_weights_file))
     agent.critic_local.load_state_dict(torch.load(critic_weights_file))
@@ -349,7 +348,7 @@ def test(actor_weights_file: str, critic_weights_file: str):
     states = env.reset()
     score = numpy.zeros(env.num_agents)
 
-    for step in range(3000):
+    for step in range(1000):
         actions = agent.act(states, add_noise=False)
         next_states, rewards, dones, _ = env.step(actions)
 
