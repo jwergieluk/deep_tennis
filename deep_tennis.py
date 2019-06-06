@@ -16,13 +16,13 @@ from collections import deque, namedtuple
 import click
 
 
-BUFFER_SIZE = int(2e5)  # replay buffer size
-BATCH_SIZE = 384        # minibatch size
-GAMMA = 0.99            # discount factor
-TAU = 1e-3              # for soft update of target parameters
-LR_ACTOR = 1e-3         # learning rate of the actor
-LR_CRITIC = 1e-3        # learning rate of the critic
-WEIGHT_DECAY = 0        # L2 weight decay
+BUFFER_SIZE = int(10000)  # replay buffer size
+BATCH_SIZE = 256         # minibatch size
+GAMMA = 0.99             # discount factor
+TAU = 1e-3               # for soft update of target parameters
+LR_ACTOR = 1e-3          # learning rate of the actor
+LR_CRITIC = 1e-3         # learning rate of the critic
+WEIGHT_DECAY = 0         # L2 weight decay
 EPSILON = 1.0
 EPSILON_DECAY = 1e-6
 TRAIN_EVERY = 5
@@ -324,11 +324,11 @@ def train(max_episodes: int, episode_len: int = 3000):
               f'Average score (last 100 episodes) {rolling_average_score:.2f}. '
               f'Replay buffer size {len(agent.memory)}.')
 
-        if episode % 50 == 0 and rolling_average_score > 0.15:
+        if episode % 50 == 0 and rolling_average_score > 0.45:
             torch.save(agent.actor_local.state_dict(), f'checkpoint_actor_{episode}.pth')
             torch.save(agent.critic_local.state_dict(), f'checkpoint_critic_{episode}.pth')
 
-        if episode % 50 == 0 and rolling_average_score > 0.15:
+        if episode % 50 == 0 and rolling_average_score > 0.45:
             df = pandas.DataFrame(data=data, index=range(1, episode+1), columns=['score', 'rolling_avg_score'])
             now_str = datetime.datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
             df.to_csv(f'scores-{now_str}.csv')
@@ -368,7 +368,7 @@ def cli():
 
 
 @cli.command('train')
-@click.option('--max-episodes', type=click.INT, default=251)
+@click.option('--max-episodes', type=click.INT, default=2001)
 def train_command(max_episodes: int):
     """ Train the agent using a head-less environment and save the parameters when done """
 

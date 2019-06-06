@@ -1,7 +1,7 @@
 \documentclass[a4paper,12pt]{amsart}
 \usepackage[utf8]{inputenc}\usepackage[T1]{fontenc}
 
-\title[Deep Deterministic Policy Gradients]{The Tennis environment solved using a Multi-Agent Deep Deterministic Policy Gradient algorithm}
+\title[Multi-Agent Deep Deterministic Policy Gradients]{The Tennis environment solved using a Deep Deterministic Policy Gradient algorithm}
 \author{Julian Wergieluk}\address{}\email{julian.wergieluk@risklab.com}
 \input{preamble}
 \input{commands}
@@ -37,218 +37,11 @@ learning algorithms of the agent developed in this project. We also report learn
 performance of the agent and provide a list of possible future model improvements.
 \end{abstract}
 
-%\begin{abstract}
-%This short note provides a concise description of the model architecture and
-%learning algorithms of the agent developed in this project. We also report learning
-%performance of the agent and provide a list of possible future model improvements.
-%\end{abstract}
-%\renewcommand*{\thefootnote}{}\footnote{\today{}}
-
 \section{Description of the learning algorithm}
 
-\subsection{Summary of the notation}
-
-%In this write-up I am going to cast the core ideas of policy gradient methods
-%into a rigorous probabilistic framework. Much of the confusion and
-%difficulty of understanding reinforcement learning comes from sloppy and
-%incomplete mathematical notation.
-
-Let's setup up the stage for the show and define a probability space
-$\left( \Omega, \mathcal F, \prob \right)$.
-Consider a Markov Decision Process (MDP) with measurable state and action spaces
-$(\stateSpace, \stateSpaceAlg)$ and $(\actionSpace, \actionSpaceAlg)$.
-A policy $\policy$ is a Markov kernel from $(\stateSpace, \stateSpaceAlg)$ to
-$(\actionSpace, \actionSpaceAlg)$, i.e.\ for each $s\in\stateSpace$, 
-$\policy(. \vb s)$ is a probability distribution on $\actionSpaceAlg$.
-A trajectory
-\begin{align*}
-    \trajectory = \left( S_0, A_0, R_1, S_1, A_1, R_2, \ldots \right) 
-\end{align*}
-encodes a sequence of states, actions and resulting
-numerical rewards pertaining to a policy $\policy$. The elements of $\tau$
-are random variables, such that $S_{0}$ has the \key{start-state distribution} 
-$\startStateDist$ (which does not depend on the policy $\pi$), 
-$\policy(. | s)$ is the conditional distribution of $A_i$ given $S_i = s$ for
-any $s\in\stateSpace$, and $\prob\left(. | S_{i-1}= s, A_{i-1}=a \right)$ is
-the conditional distribution of $S_{i}$. The rewards $R_i$ are random
-variables taking values in $\R$. The return or discounted future reward $G_t$
-at $i\in\N$ is defined as
-\begin{align}
-    G_i &= \sum_{k=0}^{\infty} \discountFactor^{k} R_{i+k+1},
-    \label{def:return}
-\end{align}
-where $\discountFactor$ is a hyperparameter from the interval $(0,1)$, used to guarantee
-the convergence of the series (\ref{def:return}).
-
-Since $\trajectory$ is a sequence of random variables, and therefore itself a random
-variable taking values in the trajectory space 
-\begin{align*}
-    \trajectorySpace = \stateSpace\times\actionSpace\times 
-        \left( \stateSpace\times\actionSpace\times\R \right)^{\infty},
-\end{align*}
-we can sample from $\trajectory$ to obtain sequences of the form
-\begin{align*}
-    \left( s_0, a_0, r_1, s_1, a_1, r_2,\ldots \right)\in\trajectorySpace.
-\end{align*}
-These samples of $\tau$ are called \key{episodes} or \key{rollouts}.
-
-The central object of interest is the mechanics of the world encoded in the
-transition probability measure $\prob(. \vb s, a)$. For $i>0$, it is the distribution of
-$S_i$ under the conditions $S_{i-1} = s$ and $A_{i-1} = a$ for fixed
-$s\in\stateSpace$ and $a\in\actionSpace$. This distribution does not depend on $i$, and,
-more importantly, does not depend on the policy $\policy$. 
-
-To simplify the setup, we assume that the reward $R_i$ at time $i$ is a deterministic
-function of the relevant states and actions. Depending on the problem at hand
-these are the three common choices encountered in the literature:
-\begin{align*}
-    R_{i} &= \rewardFunc_{1}(S_{i}), \\
-    R_{i} &= \rewardFunc_{2}(A_{i-1}, S_{i}), \\
-    R_{i} &= \rewardFunc_{3}(S_{i-1}, A_{i-1}, S_{i})
-\end{align*}
-$\rewardFunc_{1}$ is probably the most frequently used form.
-
-In reinforcement learning, we parametrize the policy $\policy_\theta$ with
-an $\R^{d}$ vector $\theta$, $d\geq 1$. The goal is to find good values for $\theta$ 
-which lead to high cumulative expected reward
-\begin{align*}
-    J\left( \theta \right) &= \E_{\theta} \left[ G_0 \right] 
-    = \E_{\theta} \left[ \sum_{k=0}^{\infty} \discountFactor^{k} R_{k+1} \right].
-\end{align*}
-The subscript $\theta$ next to the expectation operator indicates that
-the underlying probability measure $\prob_{\theta}$ combines both
-$\prob$ and $\policy_{\theta}$.
-
-\subsection{Value functions}
-
-The \key{state-value function} is defined for each state $s\in\stateSpace$ as
-\begin{align}
-    \stateValueFunc_{\theta}(s) &= \E_{\theta} \left[ G_0 | S_{0} = s \right] =
-    \E_{\theta}\left[\sum_{k=0}^{\infty} \discountFactor^{k} R_{k+1} | 
-        S_{0} = s \right].
-    \label{def:state-value-function}
-\end{align}
-The \key{action-value function} is defined for each state-action pair
-$(s,a)\in\stateSpace\times\actionSpace$ as
-\begin{align}
-    \actionValueFunc_{\theta}(s,a) &= \E_{\theta} \left[ G_0 | S_0 = s, A_{0} = a \right] = 
-    \E_{\theta}\left[\sum_{k=0}^{\infty} \discountFactor^{k} R_{k+1} | 
-        S_0 = s, A_{0} = a \right].
-    \label{def:action-value-function}
-\end{align}
-The \key{advantage function} is the difference
-\begin{align}
-    \advantageFunc_{\theta}(s,a) &= V_{\theta}(s) - Q_{\theta}(s,a).
-    \label{def:advantage-function}
-\end{align}
-
-\subsection{Episodic and perpetual tasks} 
-Reinforcement learning tasks can be partitioned into two categories, depending
-on whether the task can be completed. A task is called \key{episodic} if
-there is an end of the task, i.e.\ some notion of ``being done''.
-If there is no such notion, the task is called \key{perpetual}
-\footnote{In the literature, people use the adjective ``continuous''.
-    But we already have ``continuous spaces'', ``continuous time'', ``continuous function'', etc.
-    The word ``perpetual'' is much better at conveying the property 
-    of running indefinitely long. 
-}.
-Typical examples of episodic tasks are games. Most board games like chess and
-go, and computer games fall into this category.
-
-It is important to note, that many episodic tasks can also run 
-forever. For example, in chess, we can design a policy that ``runs in circles''
-and does not pursue the goal of winning the game. Letting such a 
-policy play against itself will result in an endless game.
-
-What distinguishes an episodic task from a perpetual one, is the existence of
-a non-empty set of end states $\coffinSpace$ in $\stateSpace$, aptly called the
-\key{coffin space}, for which we require that $\prob\left( S_{i+1} = S_{i} |
-S_{i} \in \coffinSpace \right) = 1$ and $\prob\left( R_{i} = 0 | S_{i} \in
-\coffinSpace \right) = 1$. This ensures that all the states in $\coffinSpace$
-are absorbing and that no additional reward can be accumulated after the task
-has been completed.
-
-\subsection{Categorial and continuous action spaces}
-The cardinality of the action space has a huge impact on the development of the
-theory of policy gradients as well as on the design and implementation of
-the policy optimization algorithms.
-Essentially, there are two cases we need to deal with. First, if the action
-space has finite number of elements, we call it \key{categorial}. Finite
-number of possible actions implies that the policy $\policy(.|s)$ evaluated at
-the state $s$, can be identified with a vector with $|\actionSpace|$ number of
-elements. Also, it is convenient to define the likelihood function $\policyLik$
-of the policy $\policy$ as 
-\begin{align*}
-    \policyLik(a | s) = \policy(\left\{a \right\}|s), \, a\in \actionSpace.
-\end{align*}
-$\policyLik(.|s)$ is the probability function of the probability measure 
-$\policy(.|s)$.
-
-The second case encountered in the literature is the \key{continuous} action
-space $\actionSpace$ which is a ``nice'' subset of $\R^{n_{\actionSpace}}$.
-Typical example of a continuous action space is a product of finite or infinite
-intervals in $\R^{n_{\actionSpace}}$. Let us assume that, for each state $s$, 
-the measure $\policy(.|s)$ has a density $\policyLik(.|s)$, i.e.\ 
-for an action set $\eta\in\actionSpaceAlg$ we have
-\begin{align*}
-    \policy(\eta | s) = \int_{\eta} \policyLik(a|s) da.
-\end{align*}
-As in the categorial case, we call $\policyLik(.|s)$ the likelihood function of the
-measure $\policy(.|s)$.
-
-%\subsection{Technical assumptions}
-%In the following list, we gather the technical assumptions.
-%\begin{assumption}
-%    \begin{enumerate}
-%        \item The reward function $\rewardFunc$ is measurable and bounded.
-%    \end{enumerate}
-%
-%    \label{assumptions}
-%\end{assumption}
-%
-%Let us state that our body of thought compiles without errors.
-%\begin{theorem}
-%    Suppose the conditions stated in Assumption \ref{assumptions} hold. Then we have:
-%    \begin{enumerate}
-%        \item The value functions $\stateValueFunc_{\theta}$, 
-%            $\actionValueFunc_{\theta}$, and $\advantageFunc_{\theta}$ are well-defined.
-%    \end{enumerate}
-%\end{theorem}
-
-%\subsection{Cumulative reward optimization}
-%One of our goals is to find the values of the parameter $\theta$ yielding a
-%policy that consistently produces high cumulative expected award $J(\theta)$.
-%
-%The gradient of $J(\theta)$ is given by
-%\begin{align*}
-%    \nabla_{\theta} J(\theta) &= 
-%    \nabla_{\theta} \E_{\theta} \left[ G_{0} \right] = 
-%    \E_{\theta} \left[ G_0 \sum_{i=0}^{\infty} 
-%    \nabla_{\theta}\log\policy_{\theta}(A_i | S_i) \right].
-%\end{align*}
-%
-%Using the Markov property we get
-%\begin{align*}
-%    \nabla_{\theta} J(\theta) &= 
-%    \E_{\theta} \left[ \sum_{i=0}^{\infty} G_{i}
-%    \nabla_{\theta}\log\policy_{\theta}(A_i | S_i)  \right].
-%\end{align*}
-%
-%Policy gradient with the state-value baseline
-%\begin{align*}
-%    \nabla_{\theta} J(\theta) &= 
-%    \E_{\theta} \left[ \sum_{i=0}^{\infty} \left( G_{i}-\stateValueFunc_{\theta}(S_i) \right)
-%    \nabla_{\theta}\log\policy_{\theta}(A_i | S_i) \right].
-%\end{align*}
-%
-%Policy gradient with the advantage function baseline
-%\begin{align*}
-%    \nabla_{\theta} J(\theta) &= 
-%    \E_{\theta} \left[ \sum_{i=0}^{\infty} \advantageFunc_{\theta}(S_i, A_i)
-%    \nabla_{\theta}\log\policy_{\theta}(A_i | S_i) \right].
-%\end{align*}
-
-\subsection{Deep deterministic policy gradients}
+For this problem, we use a standard Deep Deterministic Policy Gradient 
+algorithm (DDPG) and parameterize it in a way to make it suitable for multi-agent
+environments.
 
 Deep deterministic policy gradient algorithm is an actor-critic type method
 with a deterministic actor policy $\pi$ mapping states from $\stateSpace$ to
@@ -273,15 +66,15 @@ parameters of both actor and critic networks, described in
 
 \section{Training analysis}
 
-We train the DDPG agent for 250 episodes consisting of 1000 time steps each. The cumulative
-reward averaged over 100 episodes reaches the level of 30.23 after completing the episode
-124. 
+We train the DDPG agent for 1900 episodes consisting of at most 1000 time steps
+each. The cumulative reward averaged over 100 episodes reaches the level of
+0.5017 after completing the episode 494. 
 
 \begin{figure}[tb]
     \centering
     \includegraphics[width=\textwidth]{{scores}.pdf}
-    \caption{We train a DDPG agent for 250 episodes. The ``reward'' curve gives
-        the average reward for all 20 arms at the end of each episode. The
+    \caption{We train a DDPG agent for 1900 episodes. The ``reward'' curve gives
+        the maximum of individual agents rewards at the end of each episode. The
         ``average reward'' curve is the rolling mean of the ``reward'' curve
         calculated over 100 episodes. (For episodes $1,\cdots, 99$ we use an
         expanding window.)}
@@ -293,7 +86,7 @@ reward averaged over 100 episodes reaches the level of 30.23 after completing th
 \paragraph{The Actor network architecture.} The actor is a feed-forward neural
 network mapping the state of the environment to a deterministic action. The
 network consists of three layers sandwiched with batch normalization. The final
-layer uses the tanh nonlinearity to produce an action vector in the cube $[-1, 1]^{4}$.
+layer uses the tanh nonlinearity to produce an action vector in the cube $[-1, 1]^{2}$.
 
 \verbatiminput{actor-net.txt}
 
@@ -327,7 +120,7 @@ Hyperparameter & Variable name & Value \\
     OU mean reversion level & & 0.0 \\ \hline
     OU mean reversion speed & & 0.15 \\ \hline
     OU volatility (sigma) & & 0.2 \\ \hline
-    Learning frequency & \texttt{} &  every 20 time steps \\ \hline
+    Learning frequency & \texttt{} &  every 5 time steps \\ \hline
 \end{tabular}
 \label{tab:hyperparameters}
 \end{table}
@@ -335,24 +128,15 @@ Hyperparameter & Variable name & Value \\
 
 \section{Ideas for future work}
 
-
-
 \begin{itemize}
-    \item Investigation whether the OU process generating the exploratory
-        behavior of the actor could be replaced with a simple Gaussian noise.
-    \item Experimenting with bigger networks.
+    \item Use a real multi-agent reinforcement learning algorithm taking
+        non-stationarity of the environment into the account.
     \item Actor and critic could use a common network for state processing. 
-    \item Performance comparison with other continuous control policy gradient algorithms,
-        like, e.g., PPO.
 \end{itemize}
-
 
 \nocite{lillicrap2015continuous}
 \printbibliography
 
 \end{document}
-
-
-
 
 % vim: spelllang=en_us:spell:

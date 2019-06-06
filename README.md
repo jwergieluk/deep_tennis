@@ -1,7 +1,5 @@
 # Deep Tennis
 
-Requirements: https://review.udacity.com/#!/rubrics/1891/view
-
 This is a Python implementation of a policy gradient based reinforcement learning agent 
 learning to solve the "Tennis" environment from Unity's ML-agents collection.
 This project was done as part of the Udacity Deep Reinforcement Learning Nanodegree. 
@@ -75,7 +73,7 @@ pip install .
 cd ../../deep_tennis
 ```
 
-All development and testing of this code was performed on an Arch Linux system in April and Mai 2019. 
+All development and testing of this code was performed on an Arch Linux system in June 2019. 
 
 # Usage
 
