@@ -16,7 +16,7 @@ from collections import deque, namedtuple
 import click
 
 
-BUFFER_SIZE = int(10000)  # replay buffer size
+BUFFER_SIZE = int(2e5)  # replay buffer size
 BATCH_SIZE = 256         # minibatch size
 GAMMA = 0.99             # discount factor
 TAU = 1e-3               # for soft update of target parameters
