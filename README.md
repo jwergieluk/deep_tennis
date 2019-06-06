@@ -91,10 +91,10 @@ python deep_tennis.py test --actor-weights-file checkpoint-actor.pth --critic-we
 The `train` command of the `deep_tennis.py` script can be used to train an agent 
 and save the learned parameters to disk: 
 ```commandline
-python deep_tennis.py train --max-episodes 250
+python deep_tennis.py train --max-episodes 2000
 ```
 
-The above command runs for 250 training episodes and saves the resulting
+The above command runs for 2000 training episodes and saves the resulting
 parameters of a trained agent to the current directory.
 
 # License

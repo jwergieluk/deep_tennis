@@ -66,7 +66,7 @@ parameters of both actor and critic networks, described in
 
 \section{Training analysis}
 
-We train the DDPG agent for 1900 episodes consisting of at most 1000 time steps
+We train a DDPG agent for 1900 episodes consisting of at most 1000 time steps
 each. The cumulative reward averaged over 100 episodes reaches the level of
 0.5017 after completing the episode 494. 
 
@@ -125,11 +125,10 @@ Hyperparameter & Variable name & Value \\
 \label{tab:hyperparameters}
 \end{table}
 
-
 \section{Ideas for future work}
 
 \begin{itemize}
-    \item Use a real multi-agent reinforcement learning algorithm taking
+    \item Use of a real multi-agent reinforcement learning algorithm explicitly taking the
         non-stationarity of the environment into the account.
     \item Actor and critic could use a common network for state processing. 
 \end{itemize}
